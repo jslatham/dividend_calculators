@@ -148,7 +148,7 @@
     </div>
 
     <div class="card">
-      <h2>Growth over time</h2>
+      <h2>Annualized income over time</h2>
       <canvas id="chart"></canvas>
     </div>
 
@@ -333,56 +333,50 @@ function renderResult({ticker, info, lastDiv, cadence, detected, yieldAnnual,
   $('s-totret').textContent = fmtPct(final.value / initial - 1);
   $('s-cagr').textContent = fmtPct(Math.pow(final.value / initial, 1 / years) - 1);
 
-  drawChart(rows, initial, cadence, n, years);
+  drawChart(rows, cadence, n, years);
   drawTable(rows, cadence, n);
   $('result').hidden = false;
 }
 
-function drawChart(rows, initial, cadence, n, years) {
+function drawChart(rows, cadence, n, years) {
   const labels = rows.map(r => Math.round((r.period / n) * 100) / 100);
-  let cum = 0;
-  const principal = rows.map(() => initial);
-  const dividendsArr = rows.map(r => (cum += r.dividend, cum));
-  const value = rows.map(r => r.value);
-  // Stack 3 series: principal / dividends / appreciation
-  const principalY = principal;
-  const divsY = dividendsArr.map((d, i) => principal[i] + d);
-  const appreciationY = value;
+  // Annualized income at each period = period dividend × payouts per year
+  const annualized = rows.map(r => r.dividend * n);
 
   if (chart) chart.destroy();
   const css = getComputedStyle(document.documentElement);
-  const text = css.getPropertyValue('--text').trim();
-  const muted = css.getPropertyValue('--muted').trim();
-  const border = css.getPropertyValue('--border').trim();
-  Chart.defaults.color = text;
-  Chart.defaults.borderColor = border;
+  Chart.defaults.color = css.getPropertyValue('--text').trim();
+  Chart.defaults.borderColor = css.getPropertyValue('--border').trim();
 
   chart = new Chart($('chart'), {
     type: 'line',
     data: {
       labels,
-      datasets: [
-        {label: 'Initial', data: principalY, borderColor: '#4C72B0',
-         backgroundColor: 'rgba(76,114,176,0.4)', fill: 'origin',
-         pointRadius: 0, borderWidth: 1},
-        {label: 'Reinvested dividends', data: divsY, borderColor: '#3fb950',
-         backgroundColor: 'rgba(63,185,80,0.4)', fill: '-1',
-         pointRadius: 0, borderWidth: 1},
-        {label: 'Price appreciation', data: appreciationY, borderColor: '#f85149',
-         backgroundColor: 'rgba(248,81,73,0.4)', fill: '-1',
-         pointRadius: 0, borderWidth: 1},
-      ],
+      datasets: [{
+        label: 'Annualized income',
+        data: annualized,
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63,185,80,0.25)',
+        fill: 'origin',
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.15,
+      }],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: {mode: 'index', intersect: false},
       plugins: {
         legend: {labels: {boxWidth: 12, font: {size: 11}}},
-        tooltip: {callbacks: {label: c => `${c.dataset.label}: ${fmtUsd(c.parsed.y, 0)}`}},
+        tooltip: {callbacks: {
+          title: items => `Year ${items[0].label}`,
+          label: c => `${c.dataset.label}: ${fmtUsd(c.parsed.y, 0)}/yr`,
+        }},
       },
       scales: {
         x: {title: {display: true, text: 'Years'}, ticks: {maxTicksLimit: 8}},
-        y: {ticks: {callback: v => fmtUsd(v, 0)}},
+        y: {ticks: {callback: v => fmtUsd(v, 0)},
+            title: {display: true, text: 'Annualized income ($/yr)'}},
       },
     },
   });
@@ -391,13 +385,15 @@ function drawChart(rows, initial, cadence, n, years) {
 function drawTable(rows, cadence, n) {
   const head = `<thead><tr>
     <th>${cadence === 'yearly' ? 'Year' : 'Period'}</th>
-    <th>Price</th><th>Shares</th><th>Dividend</th><th>Value</th>
+    <th>Price</th><th>Shares</th>
+    <th>Dividend</th><th>Annualized</th><th>Market Value</th>
   </tr></thead>`;
   const body = rows.map(r => `<tr>
     <td>${periodLabel(r.period, cadence)}</td>
     <td>${fmtUsd(r.price)}</td>
     <td>${r.shares.toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
     <td>${fmtUsd(r.dividend)}</td>
+    <td>${fmtUsd(r.dividend * n)}</td>
     <td>${fmtUsd(r.value)}</td>
   </tr>`).join('');
   $('table-wrap').innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
