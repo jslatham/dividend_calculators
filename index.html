@@ -104,7 +104,7 @@
         <input id="initial" type="number" inputmode="decimal" value="10000" step="100" min="0">
       </label>
       <label>Years
-        <input id="years" type="number" inputmode="numeric" value="10" step="1" min="1" max="60">
+        <input id="years" type="number" inputmode="numeric" value="20" step="1" min="1" max="60">
       </label>
     </div>
     <div class="row">
@@ -407,12 +407,12 @@ function drawTable(rows, cadence, n) {
     <th>Dividend</th><th>Annualized</th><th>Market Value</th>
   </tr></thead>`;
   const body = rows.map(r => `<tr>
-    <td>${periodLabel(r.period, cadence)}</td>
-    <td>${fmtUsd(r.price)}</td>
+    <td>${periodLabel(r.period, cadence, new Date(), true)}</td>
+    <td>${fmtUsd(r.price, 0)}</td>
     <td>${r.shares.toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
-    <td>${fmtUsd(r.dividend)}</td>
-    <td>${fmtUsd(r.dividend * n)}</td>
-    <td>${fmtUsd(r.value)}</td>
+    <td>${fmtUsd(r.dividend, 0)}</td>
+    <td>${fmtUsd(r.dividend * n, 0)}</td>
+    <td>${fmtUsd(r.value, 0)}</td>
   </tr>`).join('');
   $('table-wrap').innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
 }
