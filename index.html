@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DRIP">
+<title>DRIP Calculator</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1f262e;
+    --border: #2d333b;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #4493f8;
+    --green: #3fb950;
+    --red: #f85149;
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f8fa;
+      --panel: #ffffff;
+      --panel-2: #f0f3f6;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --muted: #59636e;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --red: #d1242f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+               font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+               -webkit-text-size-adjust: 100%; }
+  main { max-width: 720px; margin: 0 auto;
+         padding: calc(12px + var(--safe-top)) 16px calc(24px + var(--safe-bottom)); }
+  h1 { font-size: 22px; margin: 8px 0 16px; letter-spacing: -0.01em; }
+  h2 { font-size: 17px; margin: 0 0 8px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: 0.04em; }
+  form { display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--border);
+         border-radius: 14px; padding: 14px; margin-bottom: 16px; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  input, select, button { font: inherit; color: var(--text); width: 100%;
+         background: var(--panel-2); border: 1px solid var(--border);
+         border-radius: 10px; padding: 12px 14px; min-height: 44px; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { background: var(--accent); color: white; border: none; font-weight: 600;
+           font-size: 16px; cursor: pointer; margin-top: 6px; }
+  button:active { opacity: 0.85; }
+  button:disabled { opacity: 0.5; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: var(--panel-2); border-radius: 10px; padding: 12px; }
+  .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                 letter-spacing: 0.04em; }
+  .stat .value { font-size: 17px; font-weight: 600; margin-top: 2px;
+                 font-variant-numeric: tabular-nums; }
+  .stat .value.green { color: var(--green); }
+  .meta { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .error { background: rgba(248,81,73,0.12); border: 1px solid var(--red);
+           color: var(--red); padding: 12px; border-radius: 10px; font-size: 14px; }
+  .pending { color: var(--muted); font-size: 14px; padding: 12px 0; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; padding: 10px 0; color: var(--accent);
+            font-weight: 600; font-size: 14px; user-select: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px;
+          font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px;
+       text-transform: uppercase; position: sticky; top: 0; background: var(--panel); }
+  th:first-child, td:first-child { text-align: left; }
+  .table-wrap { max-height: 60vh; overflow: auto; -webkit-overflow-scrolling: touch;
+                border: 1px solid var(--border); border-radius: 10px; }
+  canvas { width: 100% !important; height: auto !important; max-height: 280px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .install-hint { font-size: 12px; color: var(--muted); text-align: center;
+                  padding: 16px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dividend Reinvestment</h1>
+
+  <form id="form">
+    <label>Ticker
+      <input id="ticker" type="text" value="NEHI" autocapitalize="characters"
+             autocorrect="off" spellcheck="false">
+    </label>
+    <div class="row">
+      <label>Initial $
+        <input id="initial" type="number" inputmode="decimal" value="10000" step="100" min="0">
+      </label>
+      <label>Years
+        <input id="years" type="number" inputmode="numeric" value="20" step="1" min="1" max="60">
+      </label>
+    </div>
+    <div class="row">
+      <label>Price growth %/yr
+        <input id="growth" type="number" inputmode="decimal" value="0" step="0.5">
+      </label>
+      <label>Compounding
+        <select id="cadence">
+          <option value="auto">Auto-detect</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </label>
+    </div>
+    <button id="run" type="submit">Calculate</button>
+  </form>
+
+  <section id="status"></section>
+  <section id="result" hidden>
+    <div class="card">
+      <h2>Ticker</h2>
+      <p class="meta" id="ticker-meta"></p>
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Share price</div><div class="value" id="s-price"></div></div>
+        <div class="stat"><div class="label">Last dividend</div><div class="value" id="s-last"></div></div>
+        <div class="stat"><div class="label">Cadence</div><div class="value" id="s-cad"></div></div>
+        <div class="stat"><div class="label">Yield (annualized)</div><div class="value" id="s-yld"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Projection</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Final value</div><div class="value green" id="s-final"></div></div>
+        <div class="stat"><div class="label">Total dividends</div><div class="value" id="s-totaldiv"></div></div>
+        <div class="stat"><div class="label">Total return</div><div class="value" id="s-totret"></div></div>
+        <div class="stat"><div class="label">CAGR</div><div class="value" id="s-cagr"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Growth over time</h2>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Period detail</h2>
+      <details>
+        <summary id="detail-toggle">Show table</summary>
+        <div class="table-wrap" id="table-wrap"></div>
+      </details>
+    </div>
+  </section>
+
+  <p class="install-hint">
+    Install: tap the Share button in Safari, then "Add to Home Screen".
+  </p>
+</main>
+
+<script>
+const PAYOUTS = {weekly: 52, monthly: 12, quarterly: 4, yearly: 1};
+const TARGET_DAYS = {weekly: 7, monthly: 30, quarterly: 91, yearly: 365};
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+const $ = id => document.getElementById(id);
+const fmtUsd = (n, dec = 2) => '$' + n.toLocaleString('en-US',
+  {minimumFractionDigits: dec, maximumFractionDigits: dec});
+const fmtPct = n => (n * 100).toFixed(2) + '%';
+
+// --- Yahoo Finance via CORS proxy --------------------------------------
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+
+async function fetchTicker(ticker) {
+  const yahoo = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}` +
+                `?events=div&interval=1d&range=5y`;
+  let lastErr;
+  for (const wrap of PROXIES) {
+    try {
+      const r = await fetch(wrap(yahoo));
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const result = data?.chart?.result?.[0];
+      if (!result) throw new Error('No data returned');
+      const price = result.meta?.regularMarketPrice;
+      const symbol = result.meta?.symbol || ticker;
+      const longName = result.meta?.longName || result.meta?.shortName || '';
+      const divs = result.events?.dividends || {};
+      const dividends = Object.values(divs)
+        .map(d => ({date: new Date(d.date * 1000), amount: d.amount}))
+        .sort((a, b) => a.date - b.date);
+      if (!price) throw new Error('Missing price');
+      return {symbol, name: longName, price, dividends};
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('All proxies failed');
+}
+
+function detectCadence(dividends) {
+  if (dividends.length < 2) return null;
+  const recent = dividends.slice(-5);
+  const intervals = [];
+  for (let i = 1; i < recent.length; i++) {
+    intervals.push((recent[i].date - recent[i - 1].date) / 86400000);
+  }
+  const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  let best, bestDiff = Infinity;
+  for (const [k, t] of Object.entries(TARGET_DAYS)) {
+    if (Math.abs(t - avg) < bestDiff) { best = k; bestDiff = Math.abs(t - avg); }
+  }
+  return {cadence: best, avgDays: avg};
+}
+
+// --- DRIP simulation ---------------------------------------------------
+function simulate({initial, price0, yieldAnnual, growthAnnual, years, cadence}) {
+  const n = PAYOUTS[cadence];
+  const total = years * n;
+  const periodGrowth = Math.pow(1 + growthAnnual, 1 / n) - 1;
+  const periodYield = yieldAnnual / n;
+  let shares = initial / price0;
+  let price = price0;
+  const rows = [{period: 0, price, shares, dividend: 0, value: shares * price}];
+  for (let p = 1; p <= total; p++) {
+    price *= (1 + periodGrowth);
+    const div = shares * price * periodYield;
+    shares += div / price;
+    rows.push({period: p, price, shares, dividend: div, value: shares * price});
+  }
+  return {rows, n};
+}
+
+// --- Calendar label for period index -----------------------------------
+function periodLabel(idx, cadence, start = new Date()) {
+  if (cadence === 'monthly') {
+    const t = start.getFullYear() * 12 + start.getMonth() + idx;
+    return `${MONTHS[t % 12]} ${Math.floor(t / 12)}`;
+  }
+  if (cadence === 'quarterly') {
+    const sq = Math.floor(start.getMonth() / 3);
+    const t = sq + idx;
+    return `Q${(t % 4) + 1} ${start.getFullYear() + Math.floor(t / 4)}`;
+  }
+  if (cadence === 'yearly') return String(start.getFullYear() + idx);
+  if (cadence === 'weekly') {
+    const d = new Date(start.getTime() + idx * 7 * 86400000);
+    return d.toLocaleDateString('en-US', {month: 'short', day: '2-digit', year: 'numeric'});
+  }
+  return String(idx);
+}
+
+// --- UI ---------------------------------------------------------------
+let chart;
+
+function setStatus(html, isError = false) {
+  $('status').innerHTML = html
+    ? `<div class="${isError ? 'error' : 'pending'}">${html}</div>` : '';
+}
+
+async function run(e) {
+  e.preventDefault();
+  $('run').disabled = true;
+  setStatus('Fetching ' + $('ticker').value.toUpperCase() + '…');
+  $('result').hidden = true;
+
+  const ticker = $('ticker').value.trim().toUpperCase();
+  const initial = parseFloat($('initial').value);
+  const years = parseInt($('years').value, 10);
+  const growth = parseFloat($('growth').value) / 100;
+  const cadenceChoice = $('cadence').value;
+
+  let info;
+  try { info = await fetchTicker(ticker); }
+  catch (err) {
+    setStatus(`Couldn't reach Yahoo for ${ticker}: ${err.message}.<br>` +
+              `Check the symbol or try again.`, true);
+    $('run').disabled = false;
+    return;
+  }
+
+  if (!info.dividends.length) {
+    setStatus(`${ticker} has no dividend history.`, true);
+    $('run').disabled = false;
+    return;
+  }
+
+  const detected = detectCadence(info.dividends);
+  const cadence = cadenceChoice === 'auto'
+    ? (detected?.cadence || 'monthly')
+    : cadenceChoice;
+  const lastDiv = info.dividends[info.dividends.length - 1];
+  const annualizedDiv = lastDiv.amount * PAYOUTS[cadence];
+  const yieldAnnual = annualizedDiv / info.price;
+
+  const {rows, n} = simulate({
+    initial, price0: info.price,
+    yieldAnnual, growthAnnual: growth,
+    years, cadence,
+  });
+
+  renderResult({ticker, info, lastDiv, cadence, detected, yieldAnnual,
+                rows, n, initial, years});
+  setStatus('');
+  $('run').disabled = false;
+}
+
+function renderResult({ticker, info, lastDiv, cadence, detected, yieldAnnual,
+                       rows, n, initial, years}) {
+  $('ticker-meta').textContent = info.name ? `${ticker} — ${info.name}` : ticker;
+  $('s-price').textContent = fmtUsd(info.price);
+  $('s-last').textContent = fmtUsd(lastDiv.amount, 4) +
+    `  (${lastDiv.date.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})})`;
+  $('s-cad').textContent = cadence + (detected
+    ? ` (~${detected.avgDays.toFixed(0)}d avg)`
+    : '');
+  $('s-yld').textContent = fmtPct(yieldAnnual);
+
+  const final = rows[rows.length - 1];
+  const totalDiv = rows.reduce((s, r) => s + r.dividend, 0);
+  $('s-final').textContent = fmtUsd(final.value);
+  $('s-totaldiv').textContent = fmtUsd(totalDiv);
+  $('s-totret').textContent = fmtPct(final.value / initial - 1);
+  $('s-cagr').textContent = fmtPct(Math.pow(final.value / initial, 1 / years) - 1);
+
+  drawChart(rows, initial, cadence, n, years);
+  drawTable(rows, cadence, n);
+  $('result').hidden = false;
+}
+
+function drawChart(rows, initial, cadence, n, years) {
+  const labels = rows.map(r => Math.round((r.period / n) * 100) / 100);
+  let cum = 0;
+  const principal = rows.map(() => initial);
+  const dividendsArr = rows.map(r => (cum += r.dividend, cum));
+  const value = rows.map(r => r.value);
+  // Stack 3 series: principal / dividends / appreciation
+  const principalY = principal;
+  const divsY = dividendsArr.map((d, i) => principal[i] + d);
+  const appreciationY = value;
+
+  if (chart) chart.destroy();
+  const css = getComputedStyle(document.documentElement);
+  const text = css.getPropertyValue('--text').trim();
+  const muted = css.getPropertyValue('--muted').trim();
+  const border = css.getPropertyValue('--border').trim();
+  Chart.defaults.color = text;
+  Chart.defaults.borderColor = border;
+
+  chart = new Chart($('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label: 'Initial', data: principalY, borderColor: '#4C72B0',
+         backgroundColor: 'rgba(76,114,176,0.4)', fill: 'origin',
+         pointRadius: 0, borderWidth: 1},
+        {label: 'Reinvested dividends', data: divsY, borderColor: '#3fb950',
+         backgroundColor: 'rgba(63,185,80,0.4)', fill: '-1',
+         pointRadius: 0, borderWidth: 1},
+        {label: 'Price appreciation', data: appreciationY, borderColor: '#f85149',
+         backgroundColor: 'rgba(248,81,73,0.4)', fill: '-1',
+         pointRadius: 0, borderWidth: 1},
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {labels: {boxWidth: 12, font: {size: 11}}},
+        tooltip: {callbacks: {label: c => `${c.dataset.label}: ${fmtUsd(c.parsed.y, 0)}`}},
+      },
+      scales: {
+        x: {title: {display: true, text: 'Years'}, ticks: {maxTicksLimit: 8}},
+        y: {ticks: {callback: v => fmtUsd(v, 0)}},
+      },
+    },
+  });
+}
+
+function drawTable(rows, cadence, n) {
+  const head = `<thead><tr>
+    <th>${cadence === 'yearly' ? 'Year' : 'Period'}</th>
+    <th>Price</th><th>Shares</th><th>Dividend</th><th>Value</th>
+  </tr></thead>`;
+  const body = rows.map(r => `<tr>
+    <td>${periodLabel(r.period, cadence)}</td>
+    <td>${fmtUsd(r.price)}</td>
+    <td>${r.shares.toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
+    <td>${fmtUsd(r.dividend)}</td>
+    <td>${fmtUsd(r.value)}</td>
+  </tr>`).join('');
+  $('table-wrap').innerHTML = `<table>${head}<tbody>${body}</tbody></table>`;
+}
+
+$('form').addEventListener('submit', run);
+
+// Auto-run on first load so the user sees something immediately.
+window.addEventListener('load', () => $('form').requestSubmit());
+</script>
+</body>
+</html>
